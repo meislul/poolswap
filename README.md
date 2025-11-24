@@ -68,7 +68,7 @@ container := poolswap.NewEmptyContainer(pool)
 
 // Or initialize with an object:
 container := poolswap.NewContainer(pool, &MyObject{
-    data : map[string]string{"key": "value"},
+    data: map[string]string{"key": "value"},
 })
 ```
 
