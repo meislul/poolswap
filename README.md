@@ -11,7 +11,6 @@ Combines `sync.Pool` with atomic reference counting to enable non-blocking reads
 - [Why?](#why)
 - [Features](#features)
 - [Usage](#usage)
-- [Performance](#performance)
 - [Notes](#notes)
 
 ## Why?
@@ -107,46 +106,6 @@ func update(container *poolswap.Container[MyCache, *MyCache]) {
     // Old cache automatically returned to pool once all readers finish
 }
 ```
-
-## Performance
-
-The [benchmarks](./poolswap_benchmark_test.go) compare four approaches for managing a 512KB object with concurrent reads/writes on an M1 Pro (10 cores):
-
-| /ratio  | `PoolSwap` (base) | `RWMutexSwap`      | `AtomicPointer`    | `RWMutexInPlace`     |
-|:--------|:------------------|:-------------------|:-------------------|:---------------------|
-| **Time (sec/op)** |
-| 99R_1W  | `127.5µs`         | `131.0µs` (~ )     | `129.6µs` (~ )     | `128.5µs` (~ )       |
-| 90R_10W | `127.1µs`         | `114.5µs` (-9.91%) | `110.0µs` (-13.46%)| `254.5µs` (+100.23%) |
-| 50R_50W | `132.1µs`         | `114.3µs` (-13.47%)| `114.1µs` (-13.59%)| `974.4µs` (+637.73%) |
-| **Memory (B/op)** |
-| 99R_1W  | `268 B`           | `5,269 B` (+1866%) | `5,382 B` (+1908%) | `0 B` (-100%)        |
-| 90R_10W | `524 B`           | `53,345 B` (+10080%)| `52,517 B` (+9922%)| `1.5 B` (-99%)       |
-| 50R_50W | `918 B`           | `263,920 B` (+28649%)|`262,584 B` (+28503%)|`1.5 B` (-99%)       |
-
-
-For read-heavy workloads (99R/1W, typical of cache + background updater patterns), `poolswap` has negligible overhead versus `AtomicPointer` or `RWMutexSwap` while eliminating their GC pressure.
-
-For mixed workloads (50R/50W), `poolswap` adds constant overhead (14% in the example benchmark) versus pointer-swap approaches (due to reference counting) but eliminates GC pressure. Compared to `RWMutexInPlace`, which has similar allocation characteristics, `poolswap` avoids lock contention on reads (specifically 7-8× faster in this example).
-
-## Notes
-
-### Why not `sync.Pool` + `atomic.Pointer`?
-
-The naive combination is unsafe:
-
-```go
-var current atomic.Pointer[MyCache]
-var pool = sync.Pool{...}
-
-func update() {
-    newCache := pool.Get().(*MyCache)
-    // populate newCache
-    oldCache := current.Swap(newCache)
-    pool.Put(oldCache) // RACE CONDITION: readers may still be using oldCache
-}
-```
-
-When the writer swaps the pointer, readers may still hold references to `oldCache`. If `oldCache` is immediately returned to the pool, a subsequent `pool.Get()` can return the same memory location while the original reader is still using it—a use-after-free race condition. This is what the reference-counting in `poolswap` fixes.
 
 ## License
 
