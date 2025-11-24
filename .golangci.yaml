@@ -1,0 +1,25 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - wsl
+    - wsl_v5
+    - varnamelen
+    - funcorder
+    - paralleltest
+  exclusions:
+    rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - cyclop
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - gochecknoglobals
+        - depguard
+        - nlreturn
+        - revive
+        - exhaustruct
+        - gocognit

@@ -13,6 +13,7 @@ import (
 
 type MockPayload struct {
 	poolswap.Ref
+
 	ID       int64
 	Recycled atomic.Bool // used to detect use-after-free
 	Content  []byte
@@ -46,7 +47,7 @@ func TestLifecycle(t *testing.T) {
 	}
 
 	resetCalled := false
-	pool.Reset = func(p *MockPayload) bool {
+	pool.Reset = func(_ *MockPayload) bool {
 		resetCalled = true
 		return true
 	}
@@ -101,7 +102,7 @@ func TestStress_NoUseAfterFree(t *testing.T) {
 					}
 
 					if obj.Recycled.Load() {
-						panic("Race condition detected: Object recycled while held by reader!")
+						t.Fatal("Race condition detected: Object recycled while held by reader!")
 					}
 
 					container.Release(obj)
@@ -132,7 +133,7 @@ func TestProp_SequentialLogic(t *testing.T) {
 
 		pool := poolswap.NewPool(
 			func() *MockPayload { return &MockPayload{} },
-			func(obj *MockPayload) bool { return true },
+			func(_ *MockPayload) bool { return true },
 		)
 		container := poolswap.NewEmptyContainer(pool)
 
@@ -144,7 +145,7 @@ func TestProp_SequentialLogic(t *testing.T) {
 		}
 
 		t.Repeat(map[string]func(*rapid.T){
-			"Update": func(t *rapid.T) {
+			"Update": func(_ *rapid.T) {
 				newObj := container.GetNew()
 				newObj.Recycled.Store(false)
 				newObj.ID = nextID.Add(1)
@@ -189,6 +190,7 @@ func TestProp_SequentialLogic(t *testing.T) {
 					t.Skip("Nothing to release")
 					return
 				}
+
 				idx := rapid.IntRange(0, len(state.heldIDs)-1).Draw(t, "releaseIdx")
 				idToRelease := state.heldIDs[idx]
 				state.heldIDs = append(state.heldIDs[:idx], state.heldIDs[idx+1:]...)

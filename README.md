@@ -116,38 +116,56 @@ To illustrate the kind of scenario where `poolswap` is useful, here's a benchmar
 2.  **`MutexAlloc` (Allocating):** A copy-on-write protected by a `sync.RWMutex`. Similar to `AtomicPtr`, it creates garbage on every update.
 3.  **`MutexInPlace` (Blocking):** In-place updates under a `sync.RWMutex` lock, alloc-free but blocking all readers during the update.
 
-The benchmark simulates a heavy object (a `map[string]string` with 100k entries) being updated and read concurrently, with 1%, 10%, and 50% write ratios to simulate different levels of churn.
-
-### Benchmark Results
+The benchmark simulates a heavy object (a `map[string]string` with 100k entries) being updated and read concurrently, with 1%, 10%, and 50% write ratios to simulate different levels of churn. Each configuration runs with a set `GOMEMLIMIT` (512MiB, 256Mib, 50Mib) to simulate deployment environments with constrained memory.
 
 *(go1.25.1 on an Apple M1 Pro, 10 cores)*
 
-#### Time per Operation (lower is better)
-| Write Ratio | `poolswap` (baseline) | `AtomicPtr` (vs base) | `MutexAlloc` (vs base) | `MutexInPlace` (vs base) |
-|:---:|:---:|:---:|:---:|:---:|
-| **1%**  | `4.767µs` | `8.823µs` (+85%)  | `8.346µs` (+75%)   | `18.056µs` (+278%) |
-| **10%** | `49.25µs` | `102.38µs` (+107%) | `96.22µs` (+95%)   | `207.41µs` (+321%) |
-| **50%** | `243.3µs` | `476.3µs` (+95%)  | `492.5µs` (+102%)  | `1121.6µs` (+360%) |
+### 1% Writes (read-heavy, typical cache scenario)
 
-#### Number of Allocations per Operation (lower is better)
-| Write Ratio | `poolswap` (baseline) | `AtomicPtr` (vs base) | `MutexAlloc` (vs base) | `MutexInPlace` (vs base) |
-|:---:|:---:|:---:|:---:|:---:|
-| **1%**  | `0.00` | `2.00` | `2.00` | `0.00` |
-| **10%** | `0.00` | `26.00`| `26.00`| `0.00` |
-| **50%** | `0.00` | `146.5`| `145.0`| `0.00` |
+| GOMEMLIMIT | PoolSwap | AtomicPtr | MutexAlloc | MutexInPlace |
+|:-----------|:---------|:----------|:-----------|:-------------|
+| **Time (µs/op)** |
+| 512 MiB    | 5.2      | 9.2 (+76%)| 8.7 (+66%) | 18.0 (+244%) |
+| 256 MiB    | 5.2      | 8.4 (+63%)| 8.3 (+60%) | 17.8 (+245%) |
+| 50 MiB     | 6.6      | 27.9 (+321%)| 25.6 (+286%) | 17.8 (+169%) |
+| **Allocated (B/op)** |
+| 512 MiB    | 276      | 52,495 (+18,954%) | 52,489 (+18,952%) | 81 (-71%) |
+| 256 MiB    | 305      | 52,490 (+17,138%) | 52,488 (+17,137%) | 77 (-75%) |
+| 50 MiB     | 563      | 52,515 (+9,236%)  | 52,519 (+9,237%)  | 79 (-86%) |
 
-#### Memory Allocations per Operation (lower is better)
-| Write Ratio | `poolswap` (baseline) | `AtomicPtr` (vs base) | `MutexAlloc` (vs base) | `MutexInPlace` (vs base) |
-|:---:|:---:|:---:|:---:|:---:|
-| **1%**  | `272 B` | `52.5 KiB` (+19,166%) | `52.5 KiB` (+19,164%) | `83 B` (-69%) |
-| **10%** | `2.6 KiB` | `545.7 KiB` (+20,319%)| `540.4 KiB` (+20,123%)| `962 B` (-64%)|
-| **50%** | `12.6 KiB`| `2,915 KiB` (+22,949%)| `2,876 KiB` (+22,647%)| `5.3 KiB` (-57%)|
+### 10% Writes
+
+| GOMEMLIMIT | PoolSwap | AtomicPtr | MutexAlloc | MutexInPlace |
+|:-----------|:---------|:----------|:-----------|:-------------|
+| **Time (µs/op)** |
+| 512 MiB    | 51.3     | 105.9 (+106%) | 92.9 (+81%) | 198.9 (+287%) |
+| 256 MiB    | 49.6     | 88.2 (+78%)   | 88.5 (+79%) | 200.8 (+305%) |
+| 50 MiB     | 67.4     | 349.7 (+419%) | 295.5 (+339%) | 200.5 (+198%) |
+| **Allocated (B/op)** |
+| 512 MiB    | 2,880    | 547,803 (+18,921%) | 541,441 (+18,700%) | 958 (-67%) |
+| 256 MiB    | 2,569    | 543,597 (+21,060%) | 542,299 (+21,009%) | 943 (-63%) |
+| 50 MiB     | 3,628    | 586,419 (+16,064%) | 583,806 (+15,992%) | 963 (-73%) |
+
+### 50% Writes
+
+| GOMEMLIMIT | PoolSwap | AtomicPtr | MutexAlloc | MutexInPlace |
+|:-----------|:---------|:----------|:-----------|:-------------|
+| **Time (µs/op)** |
+| 512 MiB    | 277      | 570 (+106%)    | 550 (+98%)     | 1,211 (+337%) |
+| 256 MiB    | 315      | 496 (+57%)     | 507 (+61%)     | 1,289 (+309%) |
+| 50 MiB     | 336      | 2,997 (+793%)  | 2,789 (+731%)  | 1,092 (+225%) |
+| **Allocated (B/op)** |
+| 512 MiB    | 13.4 KiB | 2.9 MiB (+21,444%) | 2.9 MiB (+21,413%) | 6.2 KiB (-54%) |
+| 256 MiB    | 16.4 KiB | 2.9 MiB (+17,753%) | 2.9 MiB (+17,865%) | 6.0 KiB (-63%) |
+| 50 MiB     | 16.3 KiB | 5.1 MiB (+31,498%) | 5.1 MiB (+31,498%) | 5.3 KiB (-67%) |
 
 ### Analysis
 
-*   **Performance:** `poolswap` is consistently the fastest implementation, about **2x faster** than the pointer-swapping strategies (`AtomicPtr`, `MutexAlloc`) across all tested write ratios.
-*   **Allocation + GC Pressure:** The reason for the performance gap. `poolswap` can use a `sync.Pool` and so incurs (amortized) **zero allocations** per operation. This saves both on actual allocation work as well as on GC pause durations.
-*   **Latency:** The `MutexInPlace` strategy never allocates but is **3-4x slower** because it forces all concurrent readers to wait while an update is in progress.
+
+- **GC pressure amplifies allocation costs**: Under tight memory constraints, the performance of allocating pointer-swap approaches degrades severely - up to *~4-5x* slower than `poolswap`, which can use a `sync.Pool` and so incurs **(amortized) zero allocations** per op. This saves both on actual allocation work as well as on GC pause durations.
+- **Read-heavy workloads**: At 1% writes, `poolswap` is *~1.5x-2x* faster than (allocating) pointer-swaps under relaxed memory limits (512 MiB), but dramatically outperforms them when memory is scarce (50 MiB: *7-8x* faster).
+* **Latency:** The `MutexInPlace` strategy never allocates but is *3-4x* slower because it forces all concurrent readers to wait while an update is in progress.
+
 
 ## Notes
 

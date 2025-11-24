@@ -1,18 +1,22 @@
-package poolswap
+package poolswap_test
 
 import (
 	"fmt"
 	"math/rand"
+	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/keilerkonzept/poolswap"
 )
 
 const mapSize = 100_000
 
 var (
-	// Pre-compute the data to populate our heavy object. This ensures that the
+	// Pre-compute the data to populate our heavy object so that the
 	// "work" of filling the map is CPU-bound, not allocation-bound.
 	precomputedKeys   []string
 	precomputedValues []string
@@ -33,7 +37,8 @@ func setupPrecomputedData() {
 
 // Heavy represents a config or cache object that is expensive to create.
 type Heavy struct {
-	Ref  // Embedded for poolswap
+	poolswap.Ref // Embedded for poolswap
+
 	Data map[string]string
 }
 
@@ -55,19 +60,21 @@ func (h *Heavy) simulateRead() {
 
 func (h *Heavy) reset() bool {
 	clear(h.Data)
+
 	return true
 }
 
 func runPoolSwap(b *testing.B, writeRatio int) {
+	b.Helper()
 	setupPrecomputedData()
-	p := NewPool(
+	p := poolswap.NewPool(
 		func() *Heavy { return &Heavy{} },
 		func(h *Heavy) bool { return h.reset() },
 	)
 
 	initObj := p.Get()
 	initObj.simulateFill()
-	c := NewContainer(p, initObj)
+	c := poolswap.NewContainer(p, initObj)
 
 	b.RunParallel(func(pb *testing.PB) {
 		iter := 0
@@ -91,8 +98,8 @@ func runPoolSwap(b *testing.B, writeRatio int) {
 	})
 }
 
-// 2. Atomic Pointer (Allocating)
 func runAtomicPointer(b *testing.B, writeRatio int) {
+	b.Helper()
 	setupPrecomputedData()
 	var ptr atomic.Pointer[Heavy]
 
@@ -118,8 +125,8 @@ func runAtomicPointer(b *testing.B, writeRatio int) {
 	})
 }
 
-// 3. RWMutex (Allocating)
 func runRWMutexAlloc(b *testing.B, writeRatio int) {
+	b.Helper()
 	setupPrecomputedData()
 	var mu sync.RWMutex
 	current := &Heavy{}
@@ -148,8 +155,8 @@ func runRWMutexAlloc(b *testing.B, writeRatio int) {
 	})
 }
 
-// 4. RWMutex (In-Place)
 func runRWMutexInPlace(b *testing.B, writeRatio int) {
+	b.Helper()
 	setupPrecomputedData()
 	var mu sync.RWMutex
 	current := &Heavy{}
@@ -189,10 +196,15 @@ func BenchmarkHotSwap(b *testing.B) {
 
 	ratios := []int{1, 10, 50}
 
+	memlimit := os.Getenv("GOMEMLIMIT")
+	if memlimit == "" {
+		memlimit = "none"
+	}
 	for _, r := range ratios {
 		for _, sc := range scenarios {
-			testName := fmt.Sprintf("impl=%s/writes=%02d", sc.name, r)
+			testName := fmt.Sprintf("gomemlimit=%s/impl=%s/writes=%02d", memlimit, sc.name, r)
 			b.Run(testName, func(b *testing.B) {
+				runtime.GC()
 				b.ReportAllocs()
 				sc.fn(b, r)
 			})
