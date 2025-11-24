@@ -114,7 +114,7 @@ func NewEmptyContainer[T any, PT PtrRef[T]](pool *Pool[T, PT]) *Container[T, PT]
 	}
 }
 
-// NewEmptyContainer creates a container for objects from the given Pool, initialized
+// NewContainer creates a container for objects from the given Pool, initialized
 // with the init object.
 //
 // The object must be not be owned by another instance of poolswap.Container;
