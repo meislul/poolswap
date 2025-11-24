@@ -11,6 +11,7 @@ Combines `sync.Pool` with atomic reference counting to enable non-blocking reads
 - [Why?](#why)
 - [Features](#features)
 - [Usage](#usage)
+- [Performance](#performance)
 - [Notes](#notes)
 
 ## Why?
