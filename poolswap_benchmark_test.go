@@ -1,116 +1,200 @@
-package poolswap_test
+package poolswap
 
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
-
-	"github.com/keilerkonzept/poolswap"
 )
 
-const dataSize = 512 << 10 // 512 KB
+const mapSize = 100_000
 
-// HeavyObject simulates a cache or config object.
-// It embeds poolswap.Ref to work with poolswap.
-type HeavyObject struct {
-	poolswap.Ref
-	data []byte
+var (
+	// Pre-compute the data to populate our heavy object. This ensures that the
+	// "work" of filling the map is CPU-bound, not allocation-bound.
+	precomputedKeys   []string
+	precomputedValues []string
+	setupOnce         sync.Once
+)
+
+func setupPrecomputedData() {
+	setupOnce.Do(func() {
+		precomputedKeys = make([]string, mapSize)
+		precomputedValues = make([]string, mapSize)
+		for i := range mapSize {
+			k := strconv.Itoa(i)
+			precomputedKeys[i] = k
+			precomputedValues[i] = "value-" + k
+		}
+	})
 }
 
-func newHeavyObject() *HeavyObject {
-	h := &HeavyObject{
-		data: make([]byte, dataSize),
-	}
-	for i := range h.data {
-		h.data[i] = byte(i)
-	}
-	return h
+// Heavy represents a config or cache object that is expensive to create.
+type Heavy struct {
+	Ref  // Embedded for poolswap
+	Data map[string]string
 }
 
-func (h *HeavyObject) Reset() bool {
-	clear(h.data)
+// simulateFill populates the map from a pre-computed data source.
+func (h *Heavy) simulateFill() {
+	if h.Data == nil {
+		h.Data = make(map[string]string, mapSize)
+	}
+	for i := range mapSize {
+		h.Data[precomputedKeys[i]] = precomputedValues[i]
+	}
+}
+
+// simulateRead accesses the data.
+func (h *Heavy) simulateRead() {
+	idx := rand.Intn(mapSize)
+	_ = h.Data[precomputedKeys[idx]]
+}
+
+func (h *Heavy) reset() bool {
+	clear(h.Data)
 	return true
 }
 
-func run(b *testing.B, readRatio int, reader func(), writer func()) {
-	b.ResetTimer()
+func runPoolSwap(b *testing.B, writeRatio int) {
+	setupPrecomputedData()
+	p := NewPool(
+		func() *Heavy { return &Heavy{} },
+		func(h *Heavy) bool { return h.reset() },
+	)
+
+	initObj := p.Get()
+	initObj.simulateFill()
+	c := NewContainer(p, initObj)
+
 	b.RunParallel(func(pb *testing.PB) {
+		iter := 0
 		for pb.Next() {
-			// simulate read/write mix.
-			if rand.Intn(100) < readRatio {
-				reader()
+			iter++
+			if iter%100 < writeRatio {
+				// WRITE: Get new from pool, fill, update.
+				// This should have ~0 allocs/op.
+				newObj := c.GetNew()
+				newObj.simulateFill()
+				c.Update(newObj)
 			} else {
-				writer()
+				// READ: Acquire, read, release.
+				obj := c.Acquire()
+				if obj != nil {
+					obj.simulateRead()
+					c.Release(obj)
+				}
 			}
 		}
 	})
 }
 
-func readWork(_ *HeavyObject) {
-	time.Sleep(1 * time.Millisecond)
+// 2. Atomic Pointer (Allocating)
+func runAtomicPointer(b *testing.B, writeRatio int) {
+	setupPrecomputedData()
+	var ptr atomic.Pointer[Heavy]
+
+	h := &Heavy{}
+	h.simulateFill()
+	ptr.Store(h)
+
+	b.RunParallel(func(pb *testing.PB) {
+		iter := 0
+		for pb.Next() {
+			iter++
+			if iter%100 < writeRatio {
+				// WRITE: Allocate new object, Fill, Swap.
+				newObj := &Heavy{}
+				newObj.simulateFill()
+				ptr.Store(newObj)
+			} else {
+				// READ: Load, Read.
+				obj := ptr.Load()
+				obj.simulateRead()
+			}
+		}
+	})
 }
 
-func writeWork(_ *HeavyObject) {
-	time.Sleep(1 * time.Millisecond)
-}
-
-func runPoolSwap(b *testing.B, readRatio int) {
-	p := poolswap.NewPool(newHeavyObject, (*HeavyObject).Reset)
-	initial := p.Get()
-	c := poolswap.NewContainer(p, initial)
-	run(b, readRatio,
-		func() { obj := c.Acquire(); readWork(obj); c.Release(obj) },
-		func() { newObj := p.Get(); writeWork(newObj); c.Update(newObj) },
-	)
-}
-
-func runAtomicPointer(b *testing.B, readRatio int) {
-	var ptr atomic.Pointer[HeavyObject]
-	ptr.Store(newHeavyObject())
-	run(b, readRatio,
-		func() { obj := ptr.Load(); readWork(obj) },
-		func() { newObj := newHeavyObject(); writeWork(newObj); ptr.Store(newObj) },
-	)
-}
-
-func runRWMutexSwap(b *testing.B, readRatio int) {
+// 3. RWMutex (Allocating)
+func runRWMutexAlloc(b *testing.B, writeRatio int) {
+	setupPrecomputedData()
 	var mu sync.RWMutex
-	current := newHeavyObject()
-	run(b, readRatio,
-		func() { mu.RLock(); obj := current; mu.RUnlock(); readWork(obj) },
-		func() { newObj := newHeavyObject(); writeWork(newObj); mu.Lock(); current = newObj; mu.Unlock() },
-	)
+	current := &Heavy{}
+	current.simulateFill()
+
+	b.RunParallel(func(pb *testing.PB) {
+		iter := 0
+		for pb.Next() {
+			iter++
+			if iter%100 < writeRatio {
+				// WRITE: Allocate new object, Fill, Lock, Swap.
+				newObj := &Heavy{}
+				newObj.simulateFill()
+
+				mu.Lock()
+				current = newObj
+				mu.Unlock()
+			} else {
+				// READ: RLock, grab ptr, RUnlock, Read.
+				mu.RLock()
+				obj := current
+				mu.RUnlock()
+				obj.simulateRead()
+			}
+		}
+	})
 }
 
-func runRWMutexInPlace(b *testing.B, readRatio int) {
+// 4. RWMutex (In-Place)
+func runRWMutexInPlace(b *testing.B, writeRatio int) {
+	setupPrecomputedData()
 	var mu sync.RWMutex
-	current := newHeavyObject()
-	run(b, readRatio,
-		func() { mu.RLock(); readWork(current); mu.RUnlock() },
-		func() { mu.Lock(); current.Reset(); writeWork(current); mu.Unlock() },
-	)
+	current := &Heavy{}
+	current.simulateFill()
+
+	b.RunParallel(func(pb *testing.PB) {
+		iter := 0
+		for pb.Next() {
+			iter++
+			if iter%100 < writeRatio {
+				// WRITE: Lock, Reset, Fill, Unlock.
+				// This has ~0 allocs but blocks all readers during the fill.
+				mu.Lock()
+				current.reset()
+				current.simulateFill()
+				mu.Unlock()
+			} else {
+				// READ: RLock, Read, RUnlock.
+				mu.RLock()
+				current.simulateRead()
+				mu.RUnlock()
+			}
+		}
+	})
 }
-func Benchmark(b *testing.B) {
-	impls := map[string]func(*testing.B, int){
-		"PoolSwap":       runPoolSwap,
-		"RWMutexSwap":    runRWMutexSwap,
-		"AtomicPointer":  runAtomicPointer,
-		"RWMutexInPlace": runRWMutexInPlace,
-	}
-	ratios := map[string]int{
-		"99R_1W":  99,
-		"90R_10W": 90,
-		"50R_50W": 50,
+
+func BenchmarkHotSwap(b *testing.B) {
+	scenarios := []struct {
+		name string
+		fn   func(*testing.B, int)
+	}{
+		{"PoolSwap", runPoolSwap},
+		{"AtomicPtr", runAtomicPointer},
+		{"MutexAlloc", runRWMutexAlloc},
+		{"MutexInPlace", runRWMutexInPlace},
 	}
 
-	for implName, implFunc := range impls {
-		for ratioName, ratioVal := range ratios {
-			// Format: BenchmarkName/impl=<name>/ratio=<name>
-			b.Run(fmt.Sprintf("impl=%s/ratio=%s", implName, ratioName), func(b *testing.B) {
-				implFunc(b, ratioVal)
+	ratios := []int{1, 10, 50}
+
+	for _, r := range ratios {
+		for _, sc := range scenarios {
+			testName := fmt.Sprintf("impl=%s/writes=%02d", sc.name, r)
+			b.Run(testName, func(b *testing.B) {
+				b.ReportAllocs()
+				sc.fn(b, r)
 			})
 		}
 	}
