@@ -118,7 +118,7 @@ func NewEmptyContainer[T any, PT PtrRef[T]](pool *Pool[T, PT]) *Container[T, PT]
 // with the init object.
 //
 // The object must be not be owned by another instance of poolswap.Container;
-// The container takes ownership of the given inital value (reference count set to 1).
+// The container takes ownership of the given initial value (reference count set to 1).
 func NewContainer[T any, PT PtrRef[T]](pool *Pool[T, PT], init PT) *Container[T, PT] {
 	if init != nil {
 		init.setRef(1)
