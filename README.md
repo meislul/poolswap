@@ -5,7 +5,7 @@
 
 A goroutine-safe container for hot-swapping heavy objects (e.g., caches, configurations) without blocking readers or generating GC pressure.
 
-Combines `sync.Pool` with atomic reference counting to enable non-blocking reads while ensuring old objects are only recycled after all readers finish.
+Wraps a `sync.Pool` with atomic reference counting to enable non-blocking reads while ensuring old objects are only recycled after all readers finish.
 
 **Contents**
 - [Why?](#why)
