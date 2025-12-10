@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/keilerkonzept/poolswap.svg)](https://pkg.go.dev/github.com/keilerkonzept/poolswap)
 [![Go Report Card](https://goreportcard.com/badge/github.com/keilerkonzept/poolswap?)](https://goreportcard.com/report/github.com/keilerkonzept/poolswap)
 
-Goroutine-safe Copy-on-Write with `sync.Pool`. Wraps a `sync.Pool` with atomic reference counting to enable non-blocking reads and ensures old objects are only recycled after all readers finish.
+Goroutine-safe Copy-on-Write with `sync.Pool`. Wraps a `sync.Pool` with reference counting to enable non-blocking reads and ensures old objects are only recycled after all readers finish.
 
 **Contents**
 - [Why?](#why)
