@@ -98,7 +98,7 @@ container.WithAcquire(func(cache *MyCache) {
 
 ```go
 func update(container *poolswap.Container[MyCache, *MyCache]) {
-    newCache := pool.Get()
+    newCache := container.GetNew()
     newCache.data["key"] = "new_value"
 
     container.Update(newCache)
