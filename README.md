@@ -20,13 +20,10 @@ Read-mostly shared resources that need periodic updates present a tradeoff:
 - **Pointer swap + Copy-on-Write (e.g. `atomic.Pointer` or `sync.RWMutex`)**: Fast and non-blocking - but forces you to allocate a new object on each update, causing GC pressure
 - **`sync.Pool` + `atomic.Pointer`**: Seems ideal but is unsafe (see [Notes](#why-not-syncpool--atomicpointer) below)
 
-`poolswap` solves this through reference counting. Objects return to the pool only when all readers release them.
-
-## Features
+`poolswap` solves this through reference counting. Objects return to the pool only when all readers release them. This gives us, safely, both:
 
 - Non-blocking reads (lock held only during pointer acquisition)
 - Object reuse via `sync.Pool` (zero-allocation at steady state)
-- Type-safe API
 
 ## Usage
 
