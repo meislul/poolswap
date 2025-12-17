@@ -7,7 +7,6 @@ Goroutine-safe Copy-on-Write with `sync.Pool`. Wraps a `sync.Pool` with referenc
 
 **Contents**
 - [Why?](#why)
-- [Features](#features)
 - [Usage](#usage)
 - [Performance](#performance)
 - [Notes](#notes)
